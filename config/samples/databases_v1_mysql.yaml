@@ -1,0 +1,7 @@
+apiVersion: databases.wise2c.com/v1
+kind: Mysql
+metadata:
+  name: mysql-sample
+spec:
+  # Add fields here
+  foo: bar

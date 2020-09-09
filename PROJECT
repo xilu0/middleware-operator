@@ -1,0 +1,17 @@
+domain: wise2c.com
+multigroup: true
+repo: github.com/xilu0/middleware-operator
+resources:
+- group: databases
+  kind: Mysql
+  version: v1
+- group: databases
+  kind: Redis
+  version: v1
+- group: databases
+  kind: Elasticsearch
+  version: v1
+- group: databases
+  kind: Mongodb
+  version: v1
+version: "2"
