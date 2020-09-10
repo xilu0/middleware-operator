@@ -18,13 +18,19 @@ package controllers
 
 import (
 	"context"
+	"strings"
 
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	databasesv1 "github.com/xilu0/middleware-operator/apis/databases/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // MysqlReconciler reconciles a Mysql object
@@ -40,14 +46,73 @@ type MysqlReconciler struct {
 func (r *MysqlReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
 	_ = r.Log.WithValues("mysql", req.NamespacedName)
+	mysql := &databasesv1.Mysql{}
+	err := r.Client.Get(context.TODO(), req.NamespacedName, mysql)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, err
+	}
+	found := &appsv1.Deployment{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Namespace: mysql.Namespace, Name: mysql.Name}, found)
+	if err != nil && errors.IsNotFound(err) {
+		r.Log.Info("creating deployment for mysql")
+		deploy := DeploymentForMysql(mysql)
+		err := r.Client.Create(context.TODO(), deploy)
+		if err != nil {
+			r.Log.Error(err, "failed to create deployment for mysql")
+			return ctrl.Result{}, err
+		}
+	}
 
 	// your logic here
 
 	return ctrl.Result{}, nil
 }
-
+func DeploymentForMysql(mysql *databasesv1.Mysql) *appsv1.Deployment {
+	ls := lables(mysql.Name, mysql.Kind)
+	name := strings.ToLower(mysql.Name)
+	kind := strings.ToLower(mysql.Kind)
+	var size int32 = 1
+	var network bool = false
+	deploy := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: mysql.Namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: ls,
+			},
+			Replicas: &size,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: ls,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Image: mysql.Spec.Image,
+						Name:  kind,
+						Ports: []corev1.ContainerPort{{
+							ContainerPort: 3306,
+							Name:          kind,
+							Protocol:      "TCP",
+						}},
+					}},
+					HostNetwork: network,
+				},
+			},
+		},
+	}
+	return deploy
+}
 func (r *MysqlReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&databasesv1.Mysql{}).
 		Complete(r)
+}
+
+func lables(name string, cr string) map[string]string {
+	return map[string]string{"name": name, "cr": cr}
 }

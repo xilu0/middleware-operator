@@ -29,7 +29,7 @@ type MongodbSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of Mongodb. Edit Mongodb_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Image string `json:"image,omitempty"`
 }
 
 // MongodbStatus defines the observed state of Mongodb

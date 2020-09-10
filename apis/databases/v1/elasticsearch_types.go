@@ -29,7 +29,7 @@ type ElasticsearchSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of Elasticsearch. Edit Elasticsearch_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Image string `json:"image,omitempty"`
 }
 
 // ElasticsearchStatus defines the observed state of Elasticsearch
