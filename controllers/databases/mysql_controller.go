@@ -97,6 +97,7 @@ func (r *MysqlReconciler) DeploymentForMysql(mysql *databasesv1.Mysql) *appsv1.D
 	image := mysql.Spec.Image
 	password := mysql.Spec.RootPassword
 	affinity := mysql.Spec.Affinity
+	hostPath := mysql.Spec.VolumePath
 	var size int32 = 1
 	var network bool = false
 	deploy := &appsv1.Deployment{
@@ -126,6 +127,10 @@ func (r *MysqlReconciler) DeploymentForMysql(mysql *databasesv1.Mysql) *appsv1.D
 							Name:  "MYSQL_ROOT_PASSWORD",
 							Value: password,
 						}},
+						VolumeMounts: []corev1.VolumeMount{{
+							Name:      "data",
+							MountPath: "/var/lib/mysql",
+						}},
 					}},
 					HostNetwork: network,
 					Affinity:    &affinity,
@@ -144,6 +149,14 @@ func (r *MysqlReconciler) DeploymentForMysql(mysql *databasesv1.Mysql) *appsv1.D
 					// 		},
 					// 	},
 					// },
+					Volumes: []corev1.Volume{{
+						Name: "data",
+						VolumeSource: corev1.VolumeSource{
+							HostPath: &corev1.HostPathVolumeSource{
+								Path: hostPath,
+							},
+						},
+					}},
 				},
 			},
 		},

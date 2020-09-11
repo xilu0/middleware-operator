@@ -612,6 +612,8 @@ spec:
               type: string
             rootPassword:
               type: string
+            volumePath:
+              type: string
           required:
           - image
           - rootPassword

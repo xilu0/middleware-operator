@@ -33,6 +33,7 @@ type MysqlSpec struct {
 	Image        string          `json:"image"`
 	RootPassword string          `json:"rootPassword"`
 	Affinity     corev1.Affinity `json:"affinity,omitempty"`
+	VolumePath   string          `json:"volumePath,omitempty"`
 }
 
 // MysqlStatus defines the observed state of Mysql

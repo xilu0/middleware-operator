@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: heishui/middleware-operator
-  newTag: "202009111015"
+  newTag: v1.5
