@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,7 +30,9 @@ type MysqlSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of Mysql. Edit Mysql_types.go to remove/update
-	Image string `json:"foo,omitempty"`
+	Image        string          `json:"image"`
+	RootPassword string          `json:"rootPassword"`
+	Affinity     corev1.Affinity `json:"affinity,omitempty"`
 }
 
 // MysqlStatus defines the observed state of Mysql

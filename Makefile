@@ -1,6 +1,8 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+SHELL:=/bin/bash
+TAG ?= $$(date +%Y%m%d%H%M)
+IMG ?= heishui/middleware-operator:${TAG}
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
 
@@ -37,6 +39,17 @@ uninstall: manifests
 deploy: manifests
 	cd config/manager && kustomize edit set image controller=${IMG}
 	kustomize build config/default | kubectl apply -f -
+
+update: docker-build deploy create
+
+create:
+	kubectl apply -f config/samples/databases_v1_mysql.yaml
+
+delete:
+	kubectl delete -f config/samples/databases_v1_mysql.yaml
+
+restart: delete create
+
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen

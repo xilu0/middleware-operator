@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	databasesv1 "github.com/xilu0/middleware-operator/apis/databases/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -42,10 +44,13 @@ type MysqlReconciler struct {
 
 // +kubebuilder:rbac:groups=databases.wise2c.com,resources=mysqls,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=databases.wise2c.com,resources=mysqls/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;list;watch;create;update;patch;delete
 
 func (r *MysqlReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
 	_ = r.Log.WithValues("mysql", req.NamespacedName)
+	r.Log.Info("starting reconlile....")
 	mysql := &databasesv1.Mysql{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, mysql)
 	if err != nil {
@@ -57,8 +62,9 @@ func (r *MysqlReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	found := &appsv1.Deployment{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Namespace: mysql.Namespace, Name: mysql.Name}, found)
 	if err != nil && errors.IsNotFound(err) {
-		r.Log.Info("creating deployment for mysql")
-		deploy := DeploymentForMysql(mysql)
+		r.Log.Info("no found, creating deployment for mysql")
+		deploy := r.DeploymentForMysql(mysql)
+		fmt.Println(deploy)
 		err := r.Client.Create(context.TODO(), deploy)
 		if err != nil {
 			r.Log.Error(err, "failed to create deployment for mysql")
@@ -70,10 +76,13 @@ func (r *MysqlReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	return ctrl.Result{}, nil
 }
-func DeploymentForMysql(mysql *databasesv1.Mysql) *appsv1.Deployment {
+func (r *MysqlReconciler) DeploymentForMysql(mysql *databasesv1.Mysql) *appsv1.Deployment {
 	ls := lables(mysql.Name, mysql.Kind)
 	name := strings.ToLower(mysql.Name)
 	kind := strings.ToLower(mysql.Kind)
+	image := mysql.Spec.Image
+	password := mysql.Spec.RootPassword
+	affinity := mysql.Spec.Affinity
 	var size int32 = 1
 	var network bool = false
 	deploy := &appsv1.Deployment{
@@ -92,24 +101,46 @@ func DeploymentForMysql(mysql *databasesv1.Mysql) *appsv1.Deployment {
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image: mysql.Spec.Image,
+						Image: image,
 						Name:  kind,
 						Ports: []corev1.ContainerPort{{
 							ContainerPort: 3306,
 							Name:          kind,
 							Protocol:      "TCP",
 						}},
+						Env: []corev1.EnvVar{{
+							Name:  "MYSQL_ROOT_PASSWORD",
+							Value: password,
+						}},
 					}},
 					HostNetwork: network,
+					Affinity:    &affinity,
+					// Affinity: &corev1.Affinity{
+					// 	NodeAffinity: &corev1.NodeAffinity{
+					// 		RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+					// 			NodeSelectorTerms: []corev1.NodeSelectorTerm{{
+					// 				MatchExpressions: []corev1.NodeSelectorRequirement{{
+					// 					Key: "kubernetes.io/hostname",
+					// 					Operator: "in",
+					// 					Values: []string{
+					// 						node,
+					// 					},
+					// 				}},
+					// 			}},
+					// 		},
+					// 	},
+					// },
 				},
 			},
 		},
 	}
+	controllerutil.SetControllerReference(mysql, deploy, r.Scheme)
 	return deploy
 }
 func (r *MysqlReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&databasesv1.Mysql{}).
+		Owns(&appsv1.Deployment{}).
 		Complete(r)
 }
 
