@@ -33,6 +33,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // MysqlReconciler reconciles a Mysql object
@@ -46,6 +47,8 @@ type MysqlReconciler struct {
 // +kubebuilder:rbac:groups=databases.wise2c.com,resources=mysqls/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=services/status,verbs=get;list;watch;create;update;patch;delete
 
 func (r *MysqlReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
@@ -59,8 +62,8 @@ func (r *MysqlReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		}
 		return ctrl.Result{}, err
 	}
-	found := &appsv1.Deployment{}
-	err = r.Client.Get(context.TODO(), types.NamespacedName{Namespace: mysql.Namespace, Name: mysql.Name}, found)
+	foundDeploy := &appsv1.Deployment{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Namespace: mysql.Namespace, Name: mysql.Name}, foundDeploy)
 	if err != nil && errors.IsNotFound(err) {
 		r.Log.Info("no found, creating deployment for mysql")
 		deploy := r.DeploymentForMysql(mysql)
@@ -68,6 +71,17 @@ func (r *MysqlReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		err := r.Client.Create(context.TODO(), deploy)
 		if err != nil {
 			r.Log.Error(err, "failed to create deployment for mysql")
+			return ctrl.Result{}, err
+		}
+	}
+	foundService := &corev1.Service{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Namespace: mysql.Namespace, Name: mysql.Name}, foundService)
+	if err != nil && errors.IsNotFound(err) {
+		r.Log.Info("no found mysql service, createing")
+		service := r.ServiceFormysql(mysql)
+		err = r.Client.Create(context.TODO(), service)
+		if err != nil {
+			r.Log.Error(err, "failed to create service for mysql")
 			return ctrl.Result{}, err
 		}
 	}
@@ -137,10 +151,38 @@ func (r *MysqlReconciler) DeploymentForMysql(mysql *databasesv1.Mysql) *appsv1.D
 	controllerutil.SetControllerReference(mysql, deploy, r.Scheme)
 	return deploy
 }
+
+func (r *MysqlReconciler) ServiceFormysql(mysql *databasesv1.Mysql) *corev1.Service {
+	ls := lables(mysql.Name, mysql.Kind)
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: mysql.Namespace,
+			Name:      mysql.Name,
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: ls,
+			Ports: []corev1.ServicePort{{
+				Name:     "mysql",
+				Protocol: "TCP",
+				Port:     3306,
+				TargetPort: intstr.IntOrString{
+					Type:   0,
+					IntVal: 3306,
+					StrVal: "3306",
+				},
+			}},
+			Type: "NodePort",
+		},
+	}
+	controllerutil.SetControllerReference(mysql, service, r.Scheme)
+	return service
+}
+
 func (r *MysqlReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&databasesv1.Mysql{}).
 		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Service{}).
 		Complete(r)
 }
 
