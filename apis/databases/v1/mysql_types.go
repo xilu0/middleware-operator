@@ -25,15 +25,16 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // MysqlSpec defines the desired state of Mysql
+
 type MysqlSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of Mysql. Edit Mysql_types.go to remove/update
-	Image        string          `json:"image"`
-	RootPassword string          `json:"rootPassword"`
-	Affinity     corev1.Affinity `json:"affinity,omitempty"`
-	VolumePath   string          `json:"volumePath,omitempty"`
+	Image        string              `json:"image"`
+	RootPassword string              `json:"rootPassword"`
+	Affinity     corev1.Affinity     `json:"affinity,omitempty"`
+	Volume       corev1.VolumeSource `json:"volume,omitempty"`
 }
 
 // MysqlStatus defines the observed state of Mysql

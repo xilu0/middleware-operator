@@ -6,7 +6,13 @@ spec:
   # Add fields here
   image: mysql:5.7
   rootPassword: root123
-  volumePath: /data/mysql
+  volume:
+    # hostPath:
+    #   path: /data/mysql
+    #   type: ""
+    persistentVolumeClaim:
+      claimName: mysqlpvc
+  name: data
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -29,4 +35,41 @@ spec:
             values:
             - mysql
         topologyKey: kubernetes.io/hostname
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: mysqlpvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mysqlpv
+spec:
+  capacity:
+    storage: 20Gi
+  # volumeMode field requires BlockVolume Alpha feature gate to be enabled.
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  local:
+    path: /data/mysql
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - blackbird
+  
+  
 
